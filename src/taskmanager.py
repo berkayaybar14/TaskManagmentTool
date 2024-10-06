@@ -70,7 +70,7 @@ def main():
         
         choice = input("\nChoose a option (1-5): ")
         
-        if 5 < choice < 1:
+        if 5 < int(choice) < 1:
             print("Invalid choice. Please try again!")
 
         match choice:
