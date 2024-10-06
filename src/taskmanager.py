@@ -77,7 +77,7 @@ def main():
             case "1":
                 title = input("Enter task title: ")
                 description = input("Enter your description: ")
-                due_date = input("Enter due date (YYYY-MM-DD) or press enter to skip: ")
+                due_date = input("Enter due date (YYYY-MM-DD HH:MM:SS) or press enter to skip: ")
                 due_date = due_date if due_date else None
                 task_manager.add_task(title, description, due_date)
                 print("The task was successfully added!")
