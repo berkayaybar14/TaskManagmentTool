@@ -51,8 +51,38 @@ class TaskManger:
     # Deletes a task by task_id
     def delete_task(self, task_id):
         cursor = self.conn.cursor() 
-        cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id))
-        self.conn.commit()
+        # Begin Transaction
+        self.conn.execute('BEGIN TRANSACTION') 
+        try:
+            # Delete the specified task
+            cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
+            # Get all tasks greater than the delted task
+            cursor.execute('SELECT id FROM tasks WHERE id > ? ORDER BY id', (task_id,))
+            tasks_to_update = cursor.fetchall()
+
+            # Update all IDs of the following tasks  
+            for id in tasks_to_update:
+                new_id = id[0] - 1
+                cursor.execute('''
+                    UPDATE tasks
+                    SET id = ?
+                    WHERE id = ? 
+                ''', (new_id, id[0]))
+            
+            # Reset autoincrement counter
+            cursor.execute('''
+                UPDATE sqlite_sequence 
+                SET seq = (SELECT MAX(id) FROM tasks)
+                WHERE name = 'tasks'
+            ''')
+
+            self.conn.commit()
+            return True
+        except sqlite3.Error as e:
+            self.conn.rollback()
+            print(f"An errror occurred: {e}")
+            return False
+
 
     def close(self):
         self.conn.close()
@@ -100,8 +130,10 @@ def main():
                 print("Task marked as complete!")
             case "4":
                 task_id = input("Enter task ID to delete: ")
-                task_manager.delete_task(task_id)
-                print("Task was deleted!")
+                if task_manager.delete_task(int(task_id)):
+                    print("Task was deleted!")
+                else:
+                    print("Could not delete the task. Please try again!")
             case "5":
                 task_manager.close()
                 print("Goodbye!")
