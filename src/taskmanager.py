@@ -1,5 +1,4 @@
 import sqlite3
-from datetime import datetime
 
 class TaskManger:
     # Initialize the sqlite connection and create the table
@@ -116,6 +115,7 @@ def main():
             print("Invalid choice. Please try again!")
 
         match choice:
+
             case "1":
                 title = input("Enter task title: ")
                 description = input("Enter your description: ")
@@ -123,6 +123,7 @@ def main():
                 due_date = due_date if due_date else None
                 task_manager.add_task(title, description, due_date)
                 print("The task was successfully added!")
+
             case "2":
                 task_id = int(input("Enter task ID to view: ")) 
                 task = task_manager.get_task(task_id)
@@ -135,6 +136,7 @@ def main():
                     print(f"Due: {task[5] if task[5] else 'No due date'}")
                 else:
                     print(f"No task found with ID {task_id}") 
+
             case "3":
                 tasks = task_manager.get_all_tasks()
                 if not tasks:
@@ -148,16 +150,22 @@ def main():
                         print(f"Status: {task[3]}")
                         print(f"Created: {task[4]}")
                         print(f"Due: {task[5] if task[5] else 'No due date'}")
+
             case "4":
                 task_id = int(input("Enter task ID to mark as completed: "))
                 task_manager.update_task_status(task_id, 'completed')
                 print("Task marked as complete!")
+
             case "5":
                 task_id = int(input("Enter task ID to delete: "))
-                if task_manager.delete_task(int(task_id)):
-                    print("Task was deleted!")
+                if task_manager.task_exists(task_id):
+                    if task_manager.delete_task(task_id):
+                        print("Task was deleted!")
+                    else:
+                        print("Could not delete the task. Please try again!")
                 else:
-                    print("Could not delete the task. Please try again!")
+                    print(f"No task found with ID {task_id}")
+
             case "6":
                 task_manager.close()
                 print("Goodbye!")
