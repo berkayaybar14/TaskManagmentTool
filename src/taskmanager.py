@@ -32,6 +32,12 @@ class TaskManger:
         self.conn.commit()
         return cursor.lastrowid
 
+    # Get a task by id
+    def get_task(self, task_id):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM tasks WHERE id = ?', (task_id,))
+        return cursor.fetchone()
+
     # Returns all entries in the table
     def get_all_tasks(self):
         cursor = self.conn.cursor()
@@ -56,7 +62,7 @@ class TaskManger:
         try:
             # Delete the specified task
             cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
-            # Get all tasks greater than the delted task
+            # Get all tasks greater than the deleted task
             cursor.execute('SELECT id FROM tasks WHERE id > ? ORDER BY id', (task_id,))
             tasks_to_update = cursor.fetchall()
 
@@ -83,6 +89,11 @@ class TaskManger:
             print(f"An errror occurred: {e}")
             return False
 
+    # Check if the task with the given id exists
+    def task_exists(self, task_id):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM tasks WHERE id = ?', (task_id,))
+        return cursor.fetchall()
 
     def close(self):
         self.conn.close()
@@ -93,10 +104,11 @@ def main():
     while True:
         print("\n=== Task Management System ===")
         print("1. Add Task")
-        print("2. View All Tasks")
-        print("3. Mark Task as Complete")
-        print("4. Delete Task")
-        print("5. Exit")
+        print("2. Get one Task")
+        print("3. View All Tasks")
+        print("4. Mark Task as Complete")
+        print("5. Delete Task")
+        print("6. Exit")
         
         choice = input("\nChoose a option (1-5): ")
         
@@ -112,6 +124,18 @@ def main():
                 task_manager.add_task(title, description, due_date)
                 print("The task was successfully added!")
             case "2":
+                task_id = int(input("Enter task ID to view: ")) 
+                task = task_manager.get_task(task_id)
+                if task:
+                    print(f"\nID: {task[0]}")
+                    print(f"Title: {task[1]}")
+                    print(f"Description: {task[2]}")
+                    print(f"Status: {task[3]}")
+                    print(f"Created: {task[4]}")
+                    print(f"Due: {task[5] if task[5] else 'No due date'}")
+                else:
+                    print(f"No task found with ID {task_id}") 
+            case "3":
                 tasks = task_manager.get_all_tasks()
                 if not tasks:
                     print("No tasks found!")
@@ -124,17 +148,17 @@ def main():
                         print(f"Status: {task[3]}")
                         print(f"Created: {task[4]}")
                         print(f"Due: {task[5] if task[5] else 'No due date'}")
-            case "3":
-                task_id = input("Enter task ID to mark as completed: ")
+            case "4":
+                task_id = int(input("Enter task ID to mark as completed: "))
                 task_manager.update_task_status(task_id, 'completed')
                 print("Task marked as complete!")
-            case "4":
-                task_id = input("Enter task ID to delete: ")
+            case "5":
+                task_id = int(input("Enter task ID to delete: "))
                 if task_manager.delete_task(int(task_id)):
                     print("Task was deleted!")
                 else:
                     print("Could not delete the task. Please try again!")
-            case "5":
+            case "6":
                 task_manager.close()
                 print("Goodbye!")
                 break
