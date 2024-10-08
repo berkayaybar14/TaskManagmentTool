@@ -55,6 +55,9 @@ class TaskManger:
         
     # Deletes a task by task_id
     def delete_task(self, task_id):
+        if not self.task_exists(task_id):
+            return False 
+
         cursor = self.conn.cursor() 
         # Begin Transaction
         self.conn.execute('BEGIN TRANSACTION') 
@@ -92,7 +95,7 @@ class TaskManger:
     def task_exists(self, task_id):
         cursor = self.conn.cursor()
         cursor.execute('SELECT COUNT(*) FROM tasks WHERE id = ?', (task_id,))
-        return cursor.fetchall()
+        return cursor.fetchone()[0] > 0
 
     def close(self):
         self.conn.close()
@@ -109,7 +112,7 @@ def main():
         print("5. Delete Task")
         print("6. Exit")
         
-        choice = input("\nChoose a option (1-5): ")
+        choice = input("\nChoose a option (1-6): ")
         
         if 5 < int(choice) < 1:
             print("Invalid choice. Please try again!")
@@ -153,9 +156,12 @@ def main():
 
             case "4":
                 task_id = int(input("Enter task ID to mark as completed: "))
-                task_manager.update_task_status(task_id, 'completed')
-                print("Task marked as complete!")
-
+                if task_manager.task_exists(task_id):
+                    task_manager.update_task_status(task_id, 'completed')
+                    print("Task marked as complete!")
+                else:
+                    print(f"No task found with ID {task_id}")
+                    
             case "5":
                 task_id = int(input("Enter task ID to delete: "))
                 if task_manager.task_exists(task_id):
