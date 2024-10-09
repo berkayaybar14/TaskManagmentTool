@@ -1,15 +1,17 @@
 import sqlite3
+from typing import List
 
 class TaskManager:
     # Initialize the sqlite connection and create the table
     def __init__(self, db_path='tasks.db'):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
-        self.create_table()
+        self.create_tables()
     
     # Creates a new table
-    def create_table(self):
+    def create_tables(self):
         cursor = self.conn.cursor()
+        # Create tasks table
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,19 +20,147 @@ class TaskManager:
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             due_date DATE
-                ) 
-            ''')
+            ) 
+        ''')
+        # Create tags table
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+            )
+        ''')
+        # Create junction table for task-tag relationships
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS task_tags (
+            task_id INTEGER,
+            tag_id INTEGER,
+            PRIMARY KEY (task_id, tag_id),
+            FOREIGN KEY (task_id) REFERENCES tasks (id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE
+            )
+        ''')
         self.conn.commit()
 
     # Adds a new task to the table 
-    def add_task(self, title, description, due_date=None):
+    def add_task(self, title, description, due_date=None, tags=None):
+        cursor = self.conn.cursor()
+        try:
+            self.conn.execute('BEGIN TRANSACTION')
+            cursor.execute('''
+                INSERT INTO tasks (title, description, due_date)
+                VALUES (?, ?, ?) 
+            ''', (title, description, due_date))
+            task_id = cursor.lastrowid
+            
+            # Add tags if provided
+            if tags:
+                self.add_tags_to_task(task_id, tags)
+
+            self.conn.commit()
+            return task_id
+        except sqlite3.Error as e:
+            self.conn.rollback()
+            print(f"An error occurred: {e}")
+            raise
+        
+    # Returns the tags of a task
+    def get_task_tags(self, task_id):
         cursor = self.conn.cursor()
         cursor.execute('''
-            INSERT INTO tasks (title, description, due_date)
-            VALUES (?, ?, ?) 
-        ''', (title, description, due_date))
-        self.conn.commit()
-        return cursor.lastrowid
+            SELECT t.*, GROUP_CONCAT(tags.name) as tags
+            FROM tasks t
+            LEFT JOIN task_tags tt ON t.id = tt.task_id
+            LEFT JOIN tags ON tt.tag_id = tags.id
+            WHERE t.id = ?
+            GROUP BY t.id
+        ''', (task_id,))
+        row = cursor.fetchone()
+        
+        if row:
+            task = {
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'status': row[3],
+                'created_at': row[4],
+                'due_date': row[5],
+                'tags': row[6].split(',') if row[6] else []
+            }
+            return task
+        return None
+    
+    # Search tasks by tag
+    def search_tasks_by_tag(self, tag: str):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT t.*, GROUP_CONCAT(tags.name) as tags
+            FROM tasks t
+            JOIN task_tags tt ON t.id = tt.task_id
+            JOIN tags ON tt.tag_id
+            WHERE tags.name = ?
+            GROUP BY t.id
+        ''', (tag.lower(),))
+        
+        tasks = []
+        for row in cursor.fetchall():
+            task = {
+                'id': row[0],
+                'title': row[1],
+                'description': row[2],
+                'status': row[3],
+                'created_at': row[4],
+                'due_date': row[5],
+                'tags': row[6].split(',') if row[6] else []
+            }
+            tasks.append(task)
+        return tasks
+        
+    # Adds tags to a task
+    def add_tags_to_task(self, task_id, tags: List[str]):
+        if not self.task_exists(task_id):
+            return False
+        try:
+            cursor = self.conn.cursor()        
+            # Insert tags if it doesn't exist yet
+            for tag in tags:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO tags (name)
+                    VALUES (?)
+                ''', (tag.lower(),))
+            # Get tag id
+            cursor.execute('SELECT id FROM tags WHERE name = ?', (tag.lower(),))
+            tag_id = cursor.fetchone()[0]
+            # Link tag to task
+            cursor.execute('''
+                INSERT OR IGNORE INTO task_tags (task_id, tag_id)
+                VALUES (?, ?)
+            ''', (task_id, tag_id))
+            self.conn.commit()
+        except sqlite3.Error as e:
+            self.conn.rollback()
+            return False
+        
+    # Remove tag from a task
+    def remove_tag_from_task(self, task_id, tag: str):
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('''
+                DELETE FROM task_tags
+                WHERE task_id = ? AND tag_id IN (
+                SELECT id FROM tags WHERE name = ?
+                )
+            ''', (task_id, tag.lower()))
+            self.conn.commit()
+            return True
+        except sqlite3.Error as e:
+            self.conn.rollback()
+            return False
+        
+    # Returns all tags
+    def get_all_tags(self):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT name FROM tags ORDER BY name')
+        return [row[0] for row in cursor.fetchall()]
 
     # Get a task by id
     def get_task(self, task_id):
@@ -93,7 +223,7 @@ class TaskManager:
             self.conn.rollback()
             print(f"An errror occurred: {e}")
             return False
-
+    
     # Check if the task with the given id exists
     def task_exists(self, task_id):
         cursor = self.conn.cursor()
