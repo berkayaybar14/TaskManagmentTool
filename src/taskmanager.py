@@ -1,9 +1,10 @@
 import sqlite3
 
-class TaskManger:
+class TaskManager:
     # Initialize the sqlite connection and create the table
-    def __init__(self):
-        self.conn = sqlite3.connect('tasks.db')
+    def __init__(self, db_path='tasks.db'):
+        self.db_path = db_path
+        self.conn = sqlite3.connect(db_path)
         self.create_table()
     
     # Creates a new table
@@ -45,19 +46,21 @@ class TaskManger:
 
     # Updates the status of a task by task_id
     def update_task_status(self, task_id, status):
+        if not self.task_exists(task_id):
+            return False
         cursor = self.conn.cursor()
         cursor.execute('''
-        UPDATE tasks
-        SET status = ?
-        WHERE id = ?
-    ''', (status, task_id))
+            UPDATE tasks
+            SET status = ?
+            WHERE id = ?
+        ''', (status, task_id))
         self.conn.commit()
+        return True
         
     # Deletes a task by task_id
     def delete_task(self, task_id):
         if not self.task_exists(task_id):
             return False 
-
         cursor = self.conn.cursor() 
         # Begin Transaction
         self.conn.execute('BEGIN TRANSACTION') 
@@ -101,7 +104,7 @@ class TaskManger:
         self.conn.close()
         
 def main():
-    task_manager = TaskManger()
+    task_manager = TaskManager()
 
     while True:
         print("\n=== Task Management System ===")
