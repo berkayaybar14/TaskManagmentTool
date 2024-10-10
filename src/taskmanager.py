@@ -319,7 +319,7 @@ def main():
                     print("Something went wrong. Please try again!")
 
             case "7":
-                tag = int(input("Enter tag to search by: ")) 
+                tag = input("Enter tag to search by: ")
                 if tag in task_manager.get_all_tags():
                     print(task_manager.search_tasks_by_tag())
                 else:
