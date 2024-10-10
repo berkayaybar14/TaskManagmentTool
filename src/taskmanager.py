@@ -7,7 +7,7 @@ class TaskManager:
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
         self.create_tables()
-    
+
     # Creates a new table
     def create_tables(self):
         cursor = self.conn.cursor()
@@ -20,7 +20,7 @@ class TaskManager:
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             due_date DATE
-            ) 
+            )
         ''')
         # Create tags table
         cursor.execute('''
@@ -41,17 +41,17 @@ class TaskManager:
         ''')
         self.conn.commit()
 
-    # Adds a new task to the table 
+    # Adds a new task to the table
     def add_task(self, title, description, due_date=None, tags=None):
         cursor = self.conn.cursor()
         try:
             self.conn.execute('BEGIN TRANSACTION')
             cursor.execute('''
                 INSERT INTO tasks (title, description, due_date)
-                VALUES (?, ?, ?) 
+                VALUES (?, ?, ?)
             ''', (title, description, due_date))
             task_id = cursor.lastrowid
-            
+
             # Add tags if provided
             if tags:
                 self.add_tags_to_task(task_id, tags)
@@ -62,7 +62,7 @@ class TaskManager:
             self.conn.rollback()
             print(f"An error occurred: {e}")
             raise
-        
+
     # Returns the tags of a task
     def get_task_tags(self, task_id):
         cursor = self.conn.cursor()
@@ -75,7 +75,7 @@ class TaskManager:
             GROUP BY t.id
         ''', (task_id,))
         row = cursor.fetchone()
-        
+
         if row:
             task = {
                 'id': row[0],
@@ -88,7 +88,7 @@ class TaskManager:
             }
             return task
         return None
-    
+
     # Search tasks by tag
     def search_tasks_by_tag(self, tag: str):
         cursor = self.conn.cursor()
@@ -100,7 +100,7 @@ class TaskManager:
             WHERE tags.name = ?
             GROUP BY t.id
         ''', (tag.lower(),))
-        
+
         tasks = []
         for row in cursor.fetchall():
             task = {
@@ -114,32 +114,33 @@ class TaskManager:
             }
             tasks.append(task)
         return tasks
-        
+
     # Adds tags to a task
     def add_tags_to_task(self, task_id, tags: List[str]):
         if not self.task_exists(task_id):
             return False
         try:
-            cursor = self.conn.cursor()        
+            cursor = self.conn.cursor()
             # Insert tags if it doesn't exist yet
             for tag in tags:
                 cursor.execute('''
                     INSERT OR IGNORE INTO tags (name)
                     VALUES (?)
                 ''', (tag.lower(),))
-            # Get tag id
-            cursor.execute('SELECT id FROM tags WHERE name = ?', (tag.lower(),))
-            tag_id = cursor.fetchone()[0]
-            # Link tag to task
-            cursor.execute('''
-                INSERT OR IGNORE INTO task_tags (task_id, tag_id)
-                VALUES (?, ?)
-            ''', (task_id, tag_id))
+                # Get tag id
+                cursor.execute('SELECT id FROM tags WHERE name = ?', (tag.lower(),))
+                tag_id = cursor.fetchone()[0]
+                # Link tag to task
+                cursor.execute('''
+                    INSERT OR IGNORE INTO task_tags (task_id, tag_id)
+                    VALUES (?, ?)
+                ''', (task_id, tag_id))
             self.conn.commit()
+            return True
         except sqlite3.Error as e:
             self.conn.rollback()
             return False
-        
+
     # Remove tag from a task
     def remove_tag_from_task(self, task_id, tag: str):
         cursor = self.conn.cursor()
@@ -155,7 +156,7 @@ class TaskManager:
         except sqlite3.Error as e:
             self.conn.rollback()
             return False
-        
+
     # Returns all tags
     def get_all_tags(self):
         cursor = self.conn.cursor()
@@ -186,14 +187,14 @@ class TaskManager:
         ''', (status, task_id))
         self.conn.commit()
         return True
-        
+
     # Deletes a task by task_id
     def delete_task(self, task_id):
         if not self.task_exists(task_id):
-            return False 
-        cursor = self.conn.cursor() 
+            return False
+        cursor = self.conn.cursor()
         # Begin Transaction
-        self.conn.execute('BEGIN TRANSACTION') 
+        self.conn.execute('BEGIN TRANSACTION')
         try:
             # Delete the specified task
             cursor.execute('DELETE FROM tasks WHERE id = ?', (task_id,))
@@ -201,18 +202,18 @@ class TaskManager:
             cursor.execute('SELECT id FROM tasks WHERE id > ? ORDER BY id', (task_id,))
             tasks_to_update = cursor.fetchall()
 
-            # Update all IDs of the following tasks  
+            # Update all IDs of the following tasks
             for id in tasks_to_update:
                 new_id = id[0] - 1
                 cursor.execute('''
                     UPDATE tasks
                     SET id = ?
-                    WHERE id = ? 
+                    WHERE id = ?
                 ''', (new_id, id[0]))
-            
+
             # Reset autoincrement counter
             cursor.execute('''
-                UPDATE sqlite_sequence 
+                UPDATE sqlite_sequence
                 SET seq = (SELECT MAX(id) FROM tasks)
                 WHERE name = 'tasks'
             ''')
@@ -223,7 +224,7 @@ class TaskManager:
             self.conn.rollback()
             print(f"An errror occurred: {e}")
             return False
-    
+
     # Check if the task with the given id exists
     def task_exists(self, task_id):
         cursor = self.conn.cursor()
@@ -232,7 +233,7 @@ class TaskManager:
 
     def close(self):
         self.conn.close()
-        
+
 def main():
     task_manager = TaskManager()
 
@@ -243,10 +244,13 @@ def main():
         print("3. View All Tasks")
         print("4. Mark Task as Complete")
         print("5. Delete Task")
-        print("6. Exit")
-        
+        print("6. Add Tags to existing Task")
+        print("7. Search Tasks by Tag")
+        print("8. Get All Tags")
+        print("9. Exit")
+
         choice = input("\nChoose a option (1-6): ")
-        
+
         if 5 < int(choice) < 1:
             print("Invalid choice. Please try again!")
 
@@ -261,7 +265,7 @@ def main():
                 print("The task was successfully added!")
 
             case "2":
-                task_id = int(input("Enter task ID to view: ")) 
+                task_id = int(input("Enter task ID to view: "))
                 task = task_manager.get_task(task_id)
                 if task:
                     print(f"\nID: {task[0]}")
@@ -271,7 +275,7 @@ def main():
                     print(f"Created: {task[4]}")
                     print(f"Due: {task[5] if task[5] else 'No due date'}")
                 else:
-                    print(f"No task found with ID {task_id}") 
+                    print(f"No task found with ID {task_id}")
 
             case "3":
                 tasks = task_manager.get_all_tasks()
@@ -294,7 +298,7 @@ def main():
                     print("Task marked as complete!")
                 else:
                     print(f"No task found with ID {task_id}")
-                    
+
             case "5":
                 task_id = int(input("Enter task ID to delete: "))
                 if task_manager.task_exists(task_id):
@@ -304,11 +308,34 @@ def main():
                         print("Could not delete the task. Please try again!")
                 else:
                     print(f"No task found with ID {task_id}")
-
+            
             case "6":
+                task_id = int(input("Enter task ID to add tags to: "))
+                user_input = input("Enter all tags you want to add (comma seperated): ").replace(" ", "")
+                tags = user_input.split(",")
+                if task_manager.add_tags_to_task(task_id, tags):
+                    print(f"Tags have been added to the task {task_id}.")
+                else:
+                    print("Something went wrong. Please try again!")
+
+            case "7":
+                tag = int(input("Enter tag to search by: ")) 
+                if tag in task_manager.get_all_tags():
+                    print(task_manager.search_tasks_by_tag())
+                else:
+                    print("Tag doesn't exist!")
+                    
+            case "8":
+                tags = task_manager.get_all_tags()
+                if tags:
+                    print(tags)
+                else:
+                    print("No tags found!")
+
+            case "9":
                 task_manager.close()
                 print("Goodbye!")
                 break
-            
+
 if __name__ == "__main__":
     main()
